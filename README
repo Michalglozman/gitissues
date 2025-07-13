@@ -7,6 +7,21 @@ This project is a data pipeline that collects and analyzes GitHub issues data fo
 ### Prerequisites
 - Node.js (v14 or higher)
 - npm (Node Package Manager)
+- GitHub Personal Access Token with `repo` scope
+
+### Environment Setup
+
+1. Create a `.env` file in the root directory:
+```bash
+touch .env
+```
+
+2. Add your GitHub token to the `.env` file:
+```bash
+GITHUB_TOKEN=your_personal_access_token_here
+```
+
+Note: You can generate a Personal Access Token in GitHub under Settings > Developer settings > Personal access tokens. Make sure it has the `repo` scope to access repository data.
 
 ### Installation
 
