@@ -1,0 +1,113 @@
+# GitHub Issues Analytics Pipeline
+
+This project is a data pipeline that collects and analyzes GitHub issues data for organizations. It fetches issues and their associated events, stores them in a SQLite database, and performs various aggregations to provide insights about issue lifecycles.
+
+## Setup and Running Instructions
+
+### Prerequisites
+- Node.js (v14 or higher)
+- npm (Node Package Manager)
+
+### Installation
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Set up the database:
+```bash
+node src/setup/db.js
+```
+This will create a SQLite database with the necessary tables for storing GitHub events and issues data.
+
+3. Run the pipeline:
+```bash
+node src/index.js <organization> <date>
+```
+Example:
+```bash
+node src/index.js airbytehq 2025-07-13T00:00:00Z
+```
+
+Note: The date should be in ISO 8601 format (YYYY-MM-DDThh:mm:ssZ)
+
+## Accessing the Data
+
+The SQLite database is located at `src/db/github.db`. You can access the data by:
+
+Using SQLite CLI:
+```bash
+sqlite3 src/db/github.db
+```
+Then you can run SQL queries, for example:
+```sql
+SELECT * FROM issues LIMIT 5;
+SELECT * FROM github_events WHERE issueId = {ISSUE_ID};
+```
+
+Or Just open the database file from `src/db/github.db` in your preferred tool.
+
+## Pipeline Explanation
+
+The pipeline consists of several stages that process GitHub issues data:
+
+1. **Data Collection**
+   - Fetches all repositories for the specified organization
+   - Retrieves issues updated since the specified date
+   - Collects all events associated with these issues
+
+2. **Data Storage**
+   - Stores raw events data in the SQLite database
+   - Events are batch-inserted for better performance
+
+3. **Data Aggregation**
+   The pipeline performs several types of aggregations for each issue:
+   - Timeline Analysis: Creates a chronological timeline of issue events
+   - Final Resolution: Determines how the issue was ultimately resolved
+   - Reopen Count: Tracks how many times an issue was reopened
+   - Label Time Analysis: Calculates time spent in different labels
+
+4. **Results Storage**
+   - Aggregated results are stored in the issues table
+   - Each issue record contains the processed analytics data
+
+## Database Schema
+
+### github_events Table
+- **id** (INTEGER PRIMARY KEY): Auto-incrementing unique identifier
+- **eventId** (INTEGER UNIQUE): Unique GitHub event identifier
+- **event** (TEXT): Type of GitHub event (e.g., labeled, unlabeled, closed)
+- **created_at** (INTEGER): Event creation timestamp
+- **issueId** (INTEGER): Associated GitHub issue identifier
+- **issueNumber** (INTEGER): Issue number in the repository
+- **actorId** (INTEGER): GitHub user ID of the event actor
+- **actorType** (TEXT): Type of GitHub account that performed the action
+- **actorLogin** (TEXT): GitHub username of the event actor
+- **repositoryName** (TEXT): Name of the repository where the event occurred
+- **labelName** (TEXT): Name of the label (for label-related events)
+
+### issues Table
+- **id** (INTEGER PRIMARY KEY): Auto-incrementing unique identifier
+- **issueId** (INTEGER UNIQUE): Unique GitHub issue identifier
+- **issueNumber** (INTEGER): Issue number in the repository
+- **timeline** (TEXT): JSON-formatted chronological timeline of issue events
+- **finalResolution** (TEXT): Final state/resolution of the issue
+- **reopenCount** (INTEGER): Number of times the issue was reopened
+- **timeSpentInLabels** (TEXT): JSON-formatted data of time spent in each label
+
+Both tables use SQLite's INTEGER PRIMARY KEY for automatic unique ID generation and indexing. The `github_events` table stores raw event data while the `issues` table contains processed analytics results.
+
+### Assumptions
+
+- **Complete Event History**: All event types are preserved in the database to support future analytics capabilities and maintain a comprehensive history.
+
+- **Incremental Data Collection**: The pipeline is designed to collect issues from a specified date onwards, enabling incremental data updates rather than full historical loads.
+
+- **Raw Event Analysis**: Contributor metrics and involvement can be derived directly from the raw events table, eliminating the need for a separate dedicated table.
+
+- **API Rate Limiting**: To comply with GitHub's API guidelines and prevent rate limiting, concurrent requests are capped at 100 for both issue and event fetching operations.
+
+- **Event Deduplication**: The `github_events` table enforces event uniqueness through the `eventId INTEGER UNIQUE` constraint, automatically preventing duplicate event entries in the database.
+
+- **Idempotent Processing**: The pipeline checks existing event timestamps against issue update times to avoid redundant API calls, making the process safely re-runnable.
